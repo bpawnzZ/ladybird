@@ -3,8 +3,16 @@ name: Build, Package and Publish
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]  # Trigger on version tags
+    paths:
+      - '**'  # Trigger on any file change
   pull_request:
     branches: [ main ]
+    paths:
+      - '**'  # Trigger on any file change
+  workflow_dispatch:  # Allow manual triggering
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly build on Monday at midnight
 
 env:
   PACKAGE_NAME: my-app
@@ -21,7 +29,7 @@ jobs:
     - name: Set up build tools
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake
+        sudo apt-get install -y build-essential cmake base-devel
 
     # Validate username is lowercase
     - name: Validate username
@@ -38,32 +46,49 @@ jobs:
         cd build
         cmake ..
         make -j$(nproc)
-        tar -czf ../$PACKAGE_NAME-$VERSION.tar.gz .
 
-    # Create pacman package
-    - name: Create pacman package
+    # Create package directory structure
+    - name: Create package structure
       run: |
         mkdir -p pkg/$PACKAGE_NAME
-        cp $PACKAGE_NAME-$VERSION.tar.gz pkg/$PACKAGE_NAME/
-        
+        cp -r build/* pkg/$PACKAGE_NAME/
+
+    # Create PKGBUILD file
+    - name: Create PKGBUILD
+      run: |
         cat > pkg/$PACKAGE_NAME/PKGBUILD <<EOL
+        # Maintainer: $GITHUB_USERNAME <$GITHUB_USERNAME@users.noreply.github.com>
         pkgname=$PACKAGE_NAME
         pkgver=$VERSION
         pkgrel=1
-        pkgdesc="My application"
+        pkgdesc="My application package"
         arch=('x86_64')
         license=('MIT')
         depends=()
-        source=("$PACKAGE_NAME-$VERSION.tar.gz")
-        sha256sums=('SKIP')
+        source=()
+        sha256sums=()
 
         package() {
-          tar -xzf $PACKAGE_NAME-$VERSION.tar.gz -C "$pkgdir"
+          mkdir -p "\$pkgdir/usr/bin"
+          mkdir -p "\$pkgdir/usr/lib"
+          mkdir -p "\$pkgdir/usr/include"
+          
+          # Copy binaries
+          find . -type f -executable -exec cp {} "\$pkgdir/usr/bin/" \;
+          
+          # Copy libraries
+          find . -name '*.so*' -exec cp {} "\$pkgdir/usr/lib/" \;
+          
+          # Copy headers
+          find . -name '*.h' -exec cp --parents {} "\$pkgdir/usr/include/" \;
         }
         EOL
-        
+
+    # Build the package
+    - name: Build package
+      run: |
         cd pkg/$PACKAGE_NAME
-        makepkg
+        makepkg -s --noconfirm
 
     # Test package installation
     - name: Test package installation
@@ -76,9 +101,7 @@ jobs:
       uses: actions/upload-artifact@v3
       with:
         name: $PACKAGE_NAME-$VERSION
-        path: |
-          $PACKAGE_NAME-$VERSION.tar.gz
-          pkg/$PACKAGE_NAME/$PACKAGE_NAME-$VERSION-1-x86_64.pkg.tar.zst
+        path: pkg/$PACKAGE_NAME/$PACKAGE_NAME-$VERSION-1-x86_64.pkg.tar.zst
 
     # Cache build artifacts
     - name: Cache build artifacts
