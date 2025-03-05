@@ -1,0 +1,44 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-20.04
+    needs: [build-appimage, build-arch-package]
+    steps:
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: appimage
+      - name: Download Arch package artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: arch-package
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref_name }}
+          body: |
+            Ladybird Browser version ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+      - name: Upload AppImage asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./appimage/ladybird-${{ github.ref_name }}.AppImage
+          asset_name: ladybird-${{ github.ref_name }}.AppImage
+          asset_content_type: application/octet-stream
+      - name: Upload Arch package asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./arch-package/ladybird-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
+          asset_name: ladybird-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
+          asset_content_type: application/octet-stream

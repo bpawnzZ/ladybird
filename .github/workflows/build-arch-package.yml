@@ -1,0 +1,59 @@
+name: Build Arch Linux Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-arch-package:
+    runs-on: ubuntu-20.04
+    container:
+      image: archlinux
+    steps:
+      - name: Install dependencies
+        run: |
+          pacman -S --noconfirm base-devel git qt5-base qt5-webengine
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Determine tag name
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - name: Download source tar.gz
+        run: |
+          wget -O ladybird.tar.gz https://github.com/LadybirdBrowser/ladybird/archive/refs/tags/${{ env.TAG_NAME }}.tar.gz
+      - name: Compute sha256sum
+        run: |
+          sha256sum ladybird.tar.gz > ladybird.tar.gz.sha256
+      - name: Create PKGBuild file
+        run: |
+          cat > PKGBuild <<EOF
+          pkgname=ladybird
+          pkgver=${{ env.TAG_NAME }}
+          pkgrel=1
+          arch=(x86_64)
+          url="https://github.com/LadybirdBrowser/ladybird"
+          license=(MIT)
+          depends=(qt5-base qt5-webengine)
+          makedepends=(cmake)
+          source=("https://github.com/LadybirdBrowser/ladybird/archive/refs/tags/${{ env.TAG_NAME }}.tar.gz")
+          sha256sums=("$(cat ladybird.tar.gz.sha256 | cut -d' ' -f1)")
+          build() {
+            cd "\$pkgname-\$pkgver"
+            mkdir build
+            cd build
+            cmake ..
+            make
+          }
+          package() {
+            cd "\$pkgname-\$pkgver/build"
+            install -Dm755 ladybird "\$pkgdir/usr/bin/ladybird"
+          }
+          EOF
+      - name: Build package
+        run: |
+          makepkg -s
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: arch-package
+          path: *.pkg.tar.zst
