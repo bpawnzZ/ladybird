@@ -1,33 +1,9 @@
-name: Build Arch Linux Package and AppImage
+name: Build Arch Linux Package
 on:
   push:
     tags:
       - 'v*'
 jobs:
-  build-appimage:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y wget fuse libfuse2
-      - name: Download AppImage tools
-        run: |
-          wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x appimagetool-x86_64.AppImage
-      - name: Build AppImage
-        run: |
-          mkdir -p AppDir/usr/bin
-          cp -r path/to/your/binary AppDir/usr/bin/
-          ./appimagetool-x86_64.AppImage AppDir ladybird-${{ github.ref_name }}.AppImage
-      - name: Upload AppImage artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: appimage
-          path: ladybird-${{ github.ref_name }}.AppImage
-
   build-arch-package:
     runs-on: ubuntu-20.04
     container:
@@ -78,41 +54,4 @@ EOF
         uses: actions/upload-artifact@v2
         with:
           name: arch-package
-          path: *.pkg.tar.zst
-
-  create-release:
-    runs-on: ubuntu-20.04
-    needs: [build-appimage, build-arch-package]
-    steps:
-      - name: Download AppImage artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: appimage
-      - name: Download Arch package artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: arch-package
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            Ladybird Browser version ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-      - name: Upload AppImage asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./appimage/ladybird-${{ github.ref_name }}.AppImage
-          asset_name: ladybird-${{ github.ref_name }}.AppImage
-          asset_content_type: application/octet-stream
-      - name: Upload Arch package asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./arch-package/ladybird-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
-          asset_name: ladybird-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
-          asset_content_type: application/octet-stream 
+          path: *.pkg.tar.zst 
