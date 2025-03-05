@@ -1,0 +1,80 @@
+name: Build, Package and Publish
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+env:
+  PACKAGE_NAME: my-app
+  VERSION: 1.0.0
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up build tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake
+
+    - name: Build application
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make -j$(nproc)
+
+    - name: Archive binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-binaries
+        path: build/
+
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    container: archlinux
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        name: built-binaries
+        path: /build
+
+    - name: Install Arch dependencies
+      run: |
+        pacman -Sy --noconfirm --needed base-devel git
+
+    - name: Prepare package structure
+      run: |
+        mkdir -p pkg/${{ env.PACKAGE_NAME}}
+        cp -r /build/* pkg/${{ env.PACKAGE_NAME}}/
+
+    - name: Create PKGBUILD
+      run: |
+        cat > pkg/${{ env.PACKAGE_NAME}}/PKGBUILD <<EOL
+        pkgname=${{ env.PACKAGE_NAME}}
+        pkgver=${{ env.VERSION}}
+        pkgrel=1
+        pkgdesc="Application package"
+        arch=('x86_64')
+        license=('MIT')
+        
+        package() {
+          install -Dm755 -t "\$pkgdir/usr/bin" *
+        }
+        EOL
+
+    - name: Build Arch package
+      run: |
+        cd pkg/${{ env.PACKAGE_NAME}}
+        makepkg -s --noconfirm
+
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.PACKAGE_NAME}}-${{ env.VERSION}}
+        path: pkg/${{ env.PACKAGE_NAME}}/*.pkg.tar.zst
