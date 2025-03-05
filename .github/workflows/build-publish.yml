@@ -98,14 +98,14 @@ jobs:
 
     # Publish to GitHub Packages
     - name: Publish to GitHub Packages
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: $PACKAGE_NAME-$VERSION
         path: pkg/$PACKAGE_NAME/$PACKAGE_NAME-$VERSION-1-x86_64.pkg.tar.zst
 
     # Cache build artifacts
     - name: Cache build artifacts
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           build
@@ -118,13 +118,13 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/download-artifact@v3
+    - uses: actions/download-artifact@v4
       with:
         name: $PACKAGE_NAME-$VERSION
         path: dist
 
     - name: Publish to GitHub Packages
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: $PACKAGE_NAME
         path: dist
