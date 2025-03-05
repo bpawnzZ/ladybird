@@ -1,4 +1,4 @@
-name: Create Release
+name: Build Arch Linux Package and AppImage
 on:
   push:
     tags:
